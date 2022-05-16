@@ -1,0 +1,78 @@
+﻿@using Noctus.Domain.Models.Emails
+@using System.Collections.Concurrent
+@using System.Threading
+@using Noctus.GenWave.Desktop.App.Managers
+@inherits Stl.Fusion.Blazor.LiveComponentBase<IEnumerable<RecoveryEmail>>
+@inject RecoveryEmailManager RecoveryEmailManager
+@inject IDialogService DialogService
+
+@{
+    var state = State.LastValue;
+    var error = State.Error;
+}
+
+<MudCard Elevation="10">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudElement HtmlTag="div" Class="d-flex mb-3">
+                <MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+                <MudText Typo="Typo.h4" Class="align-self-center flex-grow-1">Recovery Emails</MudText>
+                <MudElement HtmlTag="div" Class="align-self-center">
+	                <MudChip Icon="@Icons.Outlined.Add" Variant="Variant.Outlined" OnClick="OpenDialog" Color="Color.Default">Add</MudChip>
+                </MudElement>
+            </MudElement>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (state != null)
+        {
+            <MudTable Items="state" Hover="true" Dense="true" FixedHeader="true" Elevation="0" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Username</MudTh>
+                    <MudTh>Provider</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Username">@context.Username</MudTd>
+                    <MudTd DataLabel="Provider">@context.Provider</MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudTooltip Placement="Placement.Top" Text="Remove Email">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                           OnClick="(() => DeleteRecoveryEmail(context))"></MudIconButton>
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudText Class="d-flex justify-center my-6">No recovery emails configured</MudText>
+        }
+    </MudCardContent>
+</MudCard>
+@code {
+
+    MudTable<KeyValuePair<string, RecoveryEmail>> table;
+
+    private void OpenDialog()
+    {
+        DialogService.Show<AddRecoveryEmailDialog>("Add Recovery Email", new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            CloseButton = true
+        });
+    }
+
+    private async Task DeleteRecoveryEmail(RecoveryEmail email)
+    {
+        await RecoveryEmailManager.RemoveRecoveryEmail(email);
+    }
+
+    protected override async Task<IEnumerable<RecoveryEmail>> ComputeState(CancellationToken cancellationToken)
+    {
+        return await RecoveryEmailManager.GetRecoveryEmails();
+    }
+}

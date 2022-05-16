@@ -1,0 +1,42 @@
+﻿@using Noctus.GenWave.Desktop.App.Managers
+@using System.Threading
+@using ElectronNET.API
+
+@inject ExternalServiceManager ExternalServiceManager
+@inherits Stl.Fusion.Blazor.LiveComponentBase<double>
+
+@{
+	var state = State.LastValue;
+}
+
+<MudCard Elevation="10" Class="px-8" Style="@Style">
+	<MudCardContent>
+		<MudText Typo="Typo.h5" Class="mb-2">@Service.Label.ToUpper()</MudText>
+		<MudElement HtmlTag="div" Class="d-flex flex-row">
+			<MudElement HtmlTag="div" Class="flex-grow-1">
+				<MudText Typo="Typo.subtitle1">Balance</MudText>
+				<MudText Style="font-size: 36px">@Service.Symbol @state.ToString("N")</MudText>
+			</MudElement>
+			<MudElement HtmlTag="div" Class="d-flex flex-md-column flex-sm-column">
+				<MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.StackedBarChart" Size="Size.Small" OnClick="@(() => OpenBrowser(Service.StatsUrl))" Class="mb-3" Style="width: 100%">Stats</MudButton>
+				<MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" OnClick="@(() => OpenBrowser(Service.TopUpUrl))" Style="width: 100%">Top-up</MudButton>
+			</MudElement>
+		</MudElement>
+	</MudCardContent>
+</MudCard>
+
+@code
+{
+	[Parameter] public string Style { get; set; }
+	[Parameter] public ExternalService Service { get; set; }
+
+	protected override Task<double> ComputeState(CancellationToken cancellationToken)
+	{
+		return ExternalServiceManager.GetBalance(Service);
+	}
+
+	private async Task OpenBrowser(string link)
+	{
+		await Electron.Shell.OpenExternalAsync(link);
+	}
+}

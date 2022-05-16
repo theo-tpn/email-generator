@@ -1,0 +1,19 @@
+{
+  "GenWaveKey": "HNEH-23LW-MV63-0QEK",
+  "DiscordWebhook": "",
+  "MaxParallelTasks": "1",
+  "MaxTaskRetries": "10",
+  "TaskSpeed": "1",
+  "TargetEmail": "outlook.com",
+
+  "UserProfile": {
+    "Username": "jeammi_lecascadeur",
+    "FirstName": "Jean",
+    "LastName": "Michel",
+    "Birthday": "",
+    "Birthmonth": "",
+    "Birthyear": "",
+    "CountryCode": "",
+    "PhoneNumber": ""
+  }
+}

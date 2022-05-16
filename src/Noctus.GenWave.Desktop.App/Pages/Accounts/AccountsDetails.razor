@@ -1,0 +1,357 @@
+﻿@page "/accounts/details/{Id:int}"
+
+@using System.Threading
+@using ChartJs.Blazor.Common
+@using ChartJs.Blazor.PieChart
+@using ElectronNET.API
+@using Noctus.Domain.Interfaces.Repositories
+@using Noctus.Domain.Interfaces.Services
+@using Noctus.GenWave.Desktop.App.Services
+@using Noctus.Infrastructure.Extensions
+@using Stl.Collections
+@using Stl.Fusion
+@using Position = ChartJs.Blazor.Common.Enums.Position
+
+@inject IAccountSetRepository AccountSetRepository
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IAccountSetService AccountSetService
+@inject IDialogService DialogService
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<AccountsDetails.AccountDetailsRecord>
+
+@{
+	var state = State.LastValue;
+	var error = State.Error;
+}
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge">
+	<MudBreadcrumbs Items="_items"></MudBreadcrumbs>
+	@if (state?.Set != null)
+	{
+		<MudGrid>
+			<MudItem sm="12" md="10">
+				<MudCard Elevation="10">
+					<MudCardHeader>
+						<CardHeaderContent>
+							<MudElement HtmlTag="div" class="d-flex mb-3">
+								<MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4"/>
+								<MudElement HtmlTag="div" class="d-flex flex-column flex-grow-1">
+									<MudText Typo="Typo.h4">@state.Set.Provider set: <span class="truncate-text">@state.Set.Name</span></MudText>
+									<MudText Typo="Typo.caption">@state.Set.CreateDate.ToString("g")</MudText>
+								</MudElement>
+								<MudMenu EndIcon="@Icons.Material.Filled.KeyboardArrowDown" Label="Manage">
+									<MudMenuItem OnClick="EditName">
+										<MudElement HtmlTag="div" Class="d-flex align-center">
+											<MudIcon Icon="@Icons.Outlined.Edit" />
+											<MudText Class="ml-3">Edit name</MudText>
+										</MudElement>
+									</MudMenuItem>
+									<MudMenuItem OnClick="ImportAccounts" Disabled="state.Set.IsInLockedState">
+										<MudElement Class="d-flex align-center">
+											<MudIcon Icon="@Icons.Outlined.GroupAdd" />
+											<MudText Class="ml-3">Import existing accounts</MudText>
+										</MudElement>
+									</MudMenuItem>
+									<MudMenuItem OnClick="ClipTesting" Disabled="state.Set.IsInLockedState">
+										<MudElement HtmlTag="div" Class="d-flex align-center">
+											<MudIcon Icon="@Icons.Outlined.WifiTethering" />
+											<MudText Class="ml-3">Clip testing</MudText>
+										</MudElement>
+									</MudMenuItem>
+									<MudMenuItem OnClick="NewsletterSubscription" Class="d-flex" Disabled="state.Set.IsInLockedState">
+										<MudElement HtmlTag="div" Class="d-flex align-center">
+											<MudIcon Icon="@Icons.Outlined.MarkunreadMailbox" />
+											<MudText Class="ml-3">Newsletter subscription</MudText>
+										</MudElement>
+									</MudMenuItem>
+									<MudMenuItem OnClick="ExportToCsv">
+										<MudElement HtmlTag="div" Class="d-flex align-center">
+											<MudIcon Icon="@Icons.Custom.FileFormats.FileExcel" />
+											<MudText Class="ml-3">Export to CSV</MudText>
+										</MudElement>
+									</MudMenuItem>
+									<MudMenuItem OnClick="Delete" Class="d-flex" Disabled="state.Set.IsInLockedState">
+										<MudElement HtmlTag="div" Class="d-flex align-center">
+											<MudIcon Icon="@Icons.Outlined.Delete" Color="Color.Error" />
+											<MudText Class="ml-3">Delete</MudText>
+										</MudElement>
+									</MudMenuItem>
+								</MudMenu>
+							</MudElement>
+						</CardHeaderContent>
+					</MudCardHeader>
+					<MudCardContent>
+						@if (state.Set.IsInLockedState)
+						{
+							<MudAlert Severity="Severity.Info" Variant="Variant.Filled">
+								<MudElement HtmlTag="div" Class="d-flex flex-row">
+									<MudText>Currently executing: @state.Set.CurrentState.GetDescription().</MudText>
+									<MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ml-3"/>
+								</MudElement>
+							</MudAlert>
+						}
+
+						@if (state.Set.Accounts.Any())
+						{
+							<MudTable Items="@state.Set.Accounts" T="Account" Hover="true" Striped="true" RowsPerPage="20" Elevation="0">
+								<ToolBarContent>
+									<MudToolBarSpacer/>
+								</ToolBarContent>
+
+								<HeaderContent>
+									<MudTh>Username</MudTh>
+									<MudTh>Password</MudTh>
+									<MudTh Style="text-align: center">Country code</MudTh>
+									<MudTh Style="text-align: center">Clip status</MudTh>
+								</HeaderContent>
+
+								<RowTemplate>
+									<MudTd DataLabel="Username">@context.Username</MudTd>
+									<MudTd DataLabel="Password">@context.Password</MudTd>
+									<MudTd DataLabel="CountryCode" Style="text-align: center">@context.CountryCode</MudTd>
+									<MudTd DataLabel="ClipStatus" Style="text-align: center">
+										@switch (context.ClipStatus)
+										{
+											case ClipStatus.NOT_TESTED:
+												<MudTooltip Text="Not Tested" Placement="Placement.Top">
+													<MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Default"></MudIcon>
+												</MudTooltip>
+												break;
+											case ClipStatus.CLIPPED:
+												<MudTooltip Text="@($"Clipped. Last check {context.LastClipVerification:g}")" Placement="Placement.Top">
+													<MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Error"></MudIcon>
+												</MudTooltip>
+												break;
+											case ClipStatus.VALID:
+												<MudTooltip Text="@($"Valid. Last check {context.LastClipVerification:g}")" Placement="Placement.Top">
+													<MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success"></MudIcon>
+												</MudTooltip>
+												break;
+										}
+									</MudTd>
+								</RowTemplate>
+
+								<ChildRowContent>
+									<MudTr>
+										<td colspan="4">
+											<MudCard Elevation="0" Style="background-color: #27203e">
+												<MudCardContent Class="pa-3">
+													<MudGrid>
+														<MudItem md="6" xs="12">
+															<MudText Typo="Typo.body2" GutterBottom="true">Forward mail: @context.MasterForward</MudText>
+															<MudText Typo="Typo.body2" GutterBottom="true">Recovery code: @context.RecoveryCode</MudText>
+															<MudText Typo="Typo.body2" GutterBottom="true">Recovery mail: @context.RecoveryEmail</MudText>
+														</MudItem>
+														<MudItem md="6" xs="12">
+															<MudText Typo="Typo.subtitle1" GutterBottom="true">Aliases</MudText>
+															<MudList DisableGutters="true" Dense="true">
+																@foreach (var alias in context.Aliases)
+																{
+																	<MudListItem Text="@alias"/>
+																}
+															</MudList>
+														</MudItem>
+													</MudGrid>
+												</MudCardContent>
+											</MudCard>
+										</td>
+									</MudTr>
+								</ChildRowContent>
+
+								<PagerContent>
+									<MudTablePager/>
+								</PagerContent>
+							</MudTable>
+						}
+					</MudCardContent>
+				</MudCard>
+			</MudItem>
+
+			<MudItem sm="4" md="2">
+				<MudGrid>
+					<MudItem xs="12">
+						<MudPaper Elevation="10" Class="pa-4 d-flex flex-column align-center" Style="background: var(--card-gradient)">
+							<MudIcon Icon="@Icons.Filled.People" Size="Size.Large"></MudIcon>
+							<MudText Typo="Typo.h6">@state.Set.Accounts.Count accounts</MudText>
+						</MudPaper>
+					</MudItem>
+					<MudItem xs="12">
+						<MudPaper Elevation="10" Class="pa-4  d-flex flex-column align-center" Style="background: var(--card-gradient-2)">
+							<MudText Typo="Typo.subtitle2">clip rate</MudText>
+							<MudText Typo="Typo.h3">@state.ClipRate() %</MudText>
+						</MudPaper>
+					</MudItem>
+					<MudItem xs="12">
+						<MudPaper Elevation="10" Class="pa-4">
+							<Chart Config="_config"></Chart>
+						</MudPaper>
+					</MudItem>
+				</MudGrid>
+			</MudItem>
+		</MudGrid>
+	}
+</MudContainer>
+
+<MudMessageBox @ref="_messageBox" Title="Warning" CancelText="Cancel">
+	<MessageContent>
+		This action will delete this item. Are you sure ?
+	</MessageContent>
+	<YesButton>
+		<MudButton Variant="Variant.Filled" Color="Color.Error">Proceed</MudButton>
+	</YesButton>
+</MudMessageBox>
+
+@code {
+		[Parameter]
+		public int Id { get; set; }
+
+	private MudMessageBox _messageBox;
+
+	private List<BreadcrumbItem> _items;
+
+	private PieConfig _config = new(true)
+	{
+		Options = new PieOptions
+		{
+			Animation = new ArcAnimation { Duration = 0},
+			Title = new OptionsTitle { Display = false },
+			Legend = new Legend { Position = Position.Right, Labels = new LegendLabels {FontColor = "#f1edff" } }
+		}
+	};
+
+	public record AccountDetailsRecord(AccountSetEntity Set)
+	{
+		public decimal ClipRate()
+		{
+			var total = Set.Accounts.Count;
+
+			if (total == 0)
+				return 0;
+
+			var clipped = Set.Accounts.Count(x => x.ClipStatus == ClipStatus.CLIPPED);
+			return Math.Floor((decimal)clipped / (decimal)total * 100);
+		}
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		_items = new List<BreadcrumbItem>
+		{
+			new("Accounts", href: "/accounts"),
+			new("Details", href: $"/accounts/details/{Id}")
+		};
+
+		await State.Update(false); // load the State before the first render
+	}
+
+	protected override async Task<AccountDetailsRecord> ComputeState(CancellationToken cancellationToken)
+	{
+		_config.Data.Datasets.Clear();
+		_config.Data.Labels.Clear();
+
+		var set = await AccountSetRepository.Find(Id);
+
+		var dic = set.Accounts
+			.Select(account => account.ClipStatus)
+			.GroupBy(x => x, (status, enumerable) => new { key = status, count = enumerable.Count() })
+			.ToDictionary(arg => arg.key, arg => arg.count);
+
+		var statuses = Enum.GetValues<ClipStatus>().ToDictionary(status => status, _ => 0);
+
+		foreach (var (k, v) in dic)
+		{
+			statuses[k] = v;
+		}
+
+		var dataSet = new PieDataset<int>(statuses.Values)
+		{
+			BackgroundColor = new IndexableOption<string>(new []{ "#ff6384", "#ffcd56", "#36a2eb" })
+		};
+
+		_config.Data.Datasets.Add(dataSet);
+		_config.Data.Labels.AddRange(statuses.Keys.Select(k => k.GetDescription()));
+		return new AccountDetailsRecord(set);
+	}
+
+	private async Task Delete()
+	{
+		var messageBoxResult = await _messageBox.Show(new DialogOptions {MaxWidth = MaxWidth.Small});
+
+		if (messageBoxResult == null || messageBoxResult == false)
+			return;
+
+		if (AccountSetRepository.Delete(Id))
+		{
+			NavigationManager.NavigateTo("/accounts");
+			Snackbar.Add("Set deleted", Severity.Success);
+		}
+		else
+		{
+			Snackbar.Add("Error", Severity.Error);
+		}
+	}
+
+	private async Task ExportToCsv()
+	{
+		var set = await AccountSetRepository.Find(Id);
+		var service = new CsvExportService();
+
+		var result = await service.ExportAccounts(set.Name, set.Accounts);
+
+		if (result.IsFailed)
+		{
+			Snackbar.Add("Error while creating file", Severity.Error);
+		}
+		else
+		{
+			Snackbar.Add($"CSV file created at {result.Value}", Severity.Success,
+				options =>
+				{
+					options.Onclick = _ => Electron.Shell.OpenPathAsync(result.Value);
+					options.Action = "Open";
+				});
+		}
+	}
+
+	private async Task ClipTesting()
+	{
+		await AccountSetService.RunVerification(Id).ContinueWith(_ => {
+			Snackbar.Add("Clip testing finished", Severity.Info);
+		});
+	}
+
+	private async Task NewsletterSubscription()
+	{
+		await AccountSetService.NewsletterSubscription(Id).ContinueWith(_ => {
+			Snackbar.Add("Newsletters subscription finished", Severity.Info);
+		});
+	}
+
+	private async Task EditName()
+	{
+		var set = State.LastValue.Set;
+		var dialog = DialogService.Show<EditSetName>("Rename", new DialogParameters
+		{
+			["Name"] = set.Name
+		}, new DialogOptions {MaxWidth = MaxWidth.Small, CloseButton = true});
+
+		var dialogResult = await dialog.Result;
+
+		if (!dialogResult.Cancelled)
+		{
+			set.Name = dialogResult.Data as string;
+			AccountSetRepository.Update(set);
+		}
+	}
+
+	private void ImportAccounts()
+	{
+		var set = State.LastValue.Set;
+
+		DialogService.Show<ImportAccounts>("Add accounts", new DialogParameters
+		{
+			["Id"] = set.Id
+		});
+	}
+}

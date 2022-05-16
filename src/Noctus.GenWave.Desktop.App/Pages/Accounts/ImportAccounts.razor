@@ -1,0 +1,225 @@
+﻿@using Noctus.Domain.Interfaces.Services
+@using Noctus.GenWave.Desktop.App.Services
+@using Noctus.Infrastructure.Extensions
+
+@inject ISnackbar Snackbar
+@inject IAccountSetService AccountSetService
+@inject NavigationManager NavigationManager
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">Import accounts</MudText>
+	</TitleContent>
+	<DialogContent>
+		<MudElement HtmlTag="div" Class="d-flex justify-center mt-n5 mb-10">
+			<MudProgressLinear Value="@(_model.Step > 0 ? 1 : 0)" Min="0" Max="1" Size="Size.Medium" Color="Color.Primary" Class="mr-1" Style="width: 75px" />
+			<MudProgressLinear Value="@(_model.Step > 1 ? 1 : 0)" Min="0" Max="1" Size="Size.Medium" Color="Color.Primary" Class="mx-1" Style="width: 75px" />
+			<MudProgressLinear Value="0" Min="0" Max="1" Size="Size.Medium" Color="Color.Primary" Class="ml-1" Style="width: 75px" />
+		</MudElement>
+		<EditForm Model="_model" OnValidSubmit="Submit">
+			<DataAnnotationsValidator/>
+			<MudPaper Elevation="0" Class="pa-4">
+				@if (_model.Step == 0)
+				{
+					<MudElement HtmlTag="div" Class="d-flex align-center justify-center" Style="min-height: 300px">
+						<InputFile id="fileInput" OnChange="UploadFile" hidden accept=".csv, .xls, .xlsx"/>
+						<MudButton HtmlTag="label"
+						           Variant="Variant.Filled"
+						           Color="Color.Primary"
+						           StartIcon="@Icons.Filled.CloudUpload"
+						           for="fileInput">
+							Upload CSV file
+						</MudButton>
+					</MudElement>
+				}
+
+				@if (_model.Step == 1)
+				{
+					<MudGrid Class="d-flex align-center justify-center">
+						<MudItem xs="12" Class="d-flex justify-center">
+							<MudText>Map the columns of your CSV file to the expected fields</MudText>
+						</MudItem>
+						@foreach (var (columnType, _) in _model.Columns)
+						{
+							<MudItem xs="8" Class="d-flex align-center">
+								<MudGrid>
+									<MudItem xs="6" Class="d-flex align-center">
+										<MudText>@columnType.GetDescription()</MudText>
+									</MudItem>
+									<MudItem xs="6">
+										<MudSelect T="string" Variant="Variant.Outlined" @bind-Value="@_model.Columns[columnType]" Strict="true">
+											@if (columnType != AccountColumnType.Username || columnType != AccountColumnType.Password)
+											{
+												<MudSelectItem T="string">Do not map</MudSelectItem>
+											}
+
+											@foreach (var header in _model.MappedHeaders)
+											{
+												<MudSelectItem Value="header">@header</MudSelectItem>
+											}
+										</MudSelect>
+									</MudItem>
+								</MudGrid>
+							</MudItem>
+						}
+
+						<MudItem xs="12" Class="d-flex my-3">
+							<MudButton Variant="Variant.Text" OnClick="@(() => _model.Step--)">&lt; Prev</MudButton>
+							<div class="flex-grow-1"></div>
+							<MudButton Variant="Variant.Text" OnClick="BindColumns">Next &gt;</MudButton>
+						</MudItem>
+					</MudGrid>
+				}
+
+				@if (_model.Step == 2)
+				{
+					<MudGrid Class="d-flex align-center justify-center" Style="min-height: 300px">
+						<MudItem xs="12" Class="d-flex justify-center">
+							<MudText>Review your import</MudText>
+						</MudItem>
+						<MudSimpleTable>
+							<tbody>
+							<tr style="border: 1px solid #f67ada">
+								<td style="border:none">Accounts to import</td>
+								<td style="border:none">@_model.Records.Count</td>
+							</tr>
+							<tr style="border: 1px solid #f67ada">
+								<td style="border:none">Mapping</td>
+								<td style="border:none">
+									@foreach (var (columnType, value) in _model.Columns.Where(kvp => !string.IsNullOrEmpty(kvp.Value)))
+									{
+										<p class="mb-1">@value &rarr; @columnType.GetDescription()</p>
+									}
+								</td>
+							</tr>
+							</tbody>
+						</MudSimpleTable>
+						
+						<MudItem xs="12" Class="d-flex align-center my-3">
+						<MudButton Variant="Variant.Text" OnClick="@(() => _model.Step--)">&lt; Prev</MudButton>
+						<div class="flex-grow-1"></div>
+
+						<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px" Disabled="_processing">Proceed</MudButton>
+						@if (_processing)
+						{
+							<MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" Class="ml-3" />
+						}
+
+						<div class="flex-grow-1"></div>
+						<MudButton Variant="Variant.Text" Style="visibility: hidden">Next &gt;</MudButton>
+					</MudItem>
+					</MudGrid>
+				}
+			</MudPaper>
+		</EditForm>
+	</DialogContent>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	[Parameter] public int Id { get; set; }
+
+	public class Model
+	{
+		public Dictionary<AccountColumnType, string> Columns { get; set; } = Enum.GetValues<AccountColumnType>().ToDictionary(type => type, _ => (string) null);
+
+		public List<dynamic> Records { get; set; } = new();
+
+		public List<string> MappedHeaders { get; set; } = new();
+
+		public int Step { get; set; }
+	}
+
+	private Model _model = new();
+	private bool _processing;
+
+	public async Task Submit()
+	{
+		_processing = true;
+
+		if (Id != 0)
+		{
+			var result = await AccountSetService.ImportAccounts(Id, _model.Columns, _model.Records);
+
+			_processing = false;
+
+			var messages = string.Join("\r\n", result.Reasons.Select(e => e.Message).ToList());
+
+			if (result.IsFailed)
+			{
+			    _processing = false;
+				Snackbar.Add($"Failed importing accounts. \r\n {messages}", Severity.Error);
+			    return;
+			}
+
+			if (result.IsSuccess && messages.Any())
+			{
+				Snackbar.Add($"Partially imported {result.Value} accounts. \r\n {messages}", Severity.Warning);
+				MudDialog.Close();
+				return;
+			}
+
+			Snackbar.Add("Accounts successfully imported", Severity.Success);
+			MudDialog.Close();
+		}
+		else
+		{
+			var result = await AccountSetService.ImportAccounts(_model.Columns, _model.Records);
+
+			if (result.IsFailed)
+			{
+				var messages = string.Join("\r\n", result.Reasons.Select(e => e.Message).ToList());
+				Snackbar.Add($"Failed importing accounts. \r\n {messages}", Severity.Error);
+			    _processing = false;
+			    return;
+			}
+
+			Snackbar.Add("Accounts successfully imported", Severity.Success);
+			MudDialog.Close();
+			NavigationManager.NavigateTo($"/accounts/details/{result.Value}");
+		}
+	}
+
+	private async Task UploadFile(InputFileChangeEventArgs e)
+	{
+		var file = e.File;
+
+		var csvService = new CsvExportService();
+
+		var result = await csvService.ImportAccounts(file);
+
+		if (result.IsFailed)
+		{
+			Snackbar.Add(string.Join(",", result.Errors.Select(x => x.Message)), Severity.Error);
+			Clear();
+			return;
+		}
+
+		_model.MappedHeaders = result.Value.headers;
+		_model.Records = result.Value.records;
+		_model.Step += 1;
+
+		StateHasChanged();
+	}
+
+	private void BindColumns()
+	{
+		if (string.IsNullOrEmpty(_model.Columns[AccountColumnType.Username]) ||
+			string.IsNullOrEmpty(_model.Columns[AccountColumnType.Password]))
+		{
+			Snackbar.Add("Username and Password columns must be bind", Severity.Error);
+			return;
+		}
+
+		_model.Step += 1;
+		StateHasChanged();
+	}
+
+	private void Clear()
+	{
+		_model.MappedHeaders.Clear();
+		_model.Records.Clear();
+		StateHasChanged();
+	}
+}

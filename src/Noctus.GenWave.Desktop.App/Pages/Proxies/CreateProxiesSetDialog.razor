@@ -1,0 +1,64 @@
+﻿@using Noctus.GenWave.Desktop.App.Managers
+@using System.ComponentModel.DataAnnotations
+@inject ProxyManager ProxyManager
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">Add proxy list</MudText>
+	</TitleContent>
+	<DialogContent>
+		<EditForm Model="_model" OnValidSubmit="Submit">
+			<DataAnnotationsValidator />
+			<MudCard Elevation="0">
+				<MudCardContent>
+					<MudElement Class="mb-6" HtmlTag="div">
+						<MudTextField T="string" @bind-Value="_model.Name" Label="File name" Variant="Variant.Outlined"
+									  For="@(() => _model.Name)" />
+					</MudElement>
+
+					<MudElement Class="mb-6" HtmlTag="div">
+						<MudTextField T="string" @bind-Value="_model.List" Label="ProxiesSetId list" Lines="15" Variant="Variant.Outlined"
+									  For="@(() => _model.List)" @ref="_input" HelperText="Format ip:port:username:password"/>
+					</MudElement>
+				</MudCardContent>
+				<MudCardActions Class="d-flex justify-center mt-4">
+					<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px" StartIcon="@Icons.Material.Filled.Save">Save</MudButton>
+				</MudCardActions>
+			</MudCard>
+		</EditForm>
+	</DialogContent>
+</MudDialog>
+
+@code 
+{
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	public class Model
+	{
+		[Required]
+		[RegularExpression(@"^[0-9a-zA-Z_\-. ]+$", ErrorMessage = "Input contains forbidden characters")]
+		[MaxLength(50)]
+		public string Name { get; set; }
+
+		[Required]
+		public string List { get; set; }
+	}
+
+	private Model _model = new();
+	private MudTextField<string> _input { get; set; }
+
+	void Submit()
+	{
+		var result = ProxyManager.CreateProxiesSet(_model.Name, _model.List);
+
+		if (result.IsSuccess)
+		{
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+		else
+		{
+			_input.Error = true;
+			_input.ErrorText = "Validation failed";
+		}
+	}
+}

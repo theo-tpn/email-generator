@@ -1,0 +1,86 @@
+﻿@using Noctus.Domain.Models.Emails
+@using Noctus.GenWave.Desktop.App.Managers
+@using System.ComponentModel.DataAnnotations
+@using InputType = MudBlazor.InputType
+@inject RecoveryEmailManager RecoveryEmailManager
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">Add recovery email</MudText>
+	</TitleContent>
+	<DialogContent>
+		<EditForm Model="@_model" OnValidSubmit="Save">
+			<DataAnnotationsValidator />
+			<MudCard Elevation="0">
+				<MudCardContent>
+					<MudElement Class="mb-6" HtmlTag="div">
+						<MudTextField T="string" Label="Email" Variant="Variant.Outlined" @bind-Value="_model.Email" For="() => _model.Email"/>
+					</MudElement>
+
+					<MudElement Class="mb-6" HtmlTag="div">
+						<MudTextField T="string" Label="Password" Variant="Variant.Outlined" @bind-Value="_model.Password"  For="() => _model.Password" Adornment="Adornment.End" InputType="@_passwordInput" AdornmentIcon="@_passwordInputIcon" OnAdornmentClick="TogglePassword"/>
+					</MudElement>
+
+                    <MudElement Class="mb-6" HtmlTag="div">
+                        <MudSelect T="EmailProvider" Label="Provider" Variant="Variant.Outlined" @bind-Value="@_model.Provider" Disabled="true">
+                            <MudSelectItem Value="@EmailProvider.Gmail"/>
+                        </MudSelect>
+                    </MudElement>
+                    
+                    <MudElement Class="mb-6 ml-2" HtmlTag="div">
+                        <MudSwitch T="bool" Label="Apply DotTrick" @bind-Checked="@_model.ApplyDotTrick" Color="Color.Primary"></MudSwitch>
+                    </MudElement>
+				</MudCardContent>
+				<MudCardActions Class="d-flex justify-center mt-4">
+					<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px">Add</MudButton>
+				</MudCardActions>
+			</MudCard>
+		</EditForm>
+	</DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    public class Model
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        [Required]
+        public string Password { get; set; }
+
+        public EmailProvider Provider { get; set; }
+
+        public bool ApplyDotTrick { get; set; }
+    }
+
+    private void TogglePassword()
+    {
+        if (_showPassword)
+        {
+            _showPassword = false;
+            _passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+            _passwordInput = InputType.Password;
+        }
+        else
+        {
+            _showPassword = true;
+            _passwordInputIcon = Icons.Material.Filled.Visibility;
+            _passwordInput = InputType.Text;
+        }
+    }
+
+    private InputType _passwordInput = InputType.Password;
+    private string _passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+    private bool _showPassword;
+
+    private readonly Model _model = new() {Provider = EmailProvider.Gmail, ApplyDotTrick = false};
+
+    private async Task Save()
+    {
+        await RecoveryEmailManager.AddRecoveryEmail(_model.Email, _model.Password, _model.Provider, _model.ApplyDotTrick);
+        MudDialog.Close();
+    }
+}

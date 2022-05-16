@@ -1,0 +1,190 @@
+﻿@page "/generator/details/{Id:int}"
+
+@using System.Threading
+@using Noctus.Application
+@using Noctus.Application.Modules.AccountGen
+@using Noctus.Application.PipelineComponents
+@using Noctus.GenWave.Desktop.App.Managers
+@using Noctus.Infrastructure
+@using Stl.Fusion
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<Noctus.Application.PipelineRunInstance>
+@inject AccountGenerationManager AccountGenerationManager
+@inject ISnackbar Snackbar
+
+@{
+	var state = State.LastValue;
+	var error = State.Error;
+}
+
+<MudContainer MaxWidth="MaxWidth.Large">
+	<MudBreadcrumbs Items="_items"></MudBreadcrumbs>
+	
+	<MudCard Elevation="10">
+		<MudCardHeader>
+			<CardHeaderContent>
+				<MudElement HtmlTag="div" class="d-flex mb-3">
+					<MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+					<MudText Typo="Typo.h4" Class="align-self-center">Gen details</MudText>
+					<MudText Typo="Typo.subtitle2" Class="align-self-end ml-4">#@Id</MudText>
+				</MudElement>
+			</CardHeaderContent>
+		</MudCardHeader>
+
+		@if (state != null && state.Tasks.Any())
+		{
+			<MudCardContent>
+				<MudTable Items="@state.Tasks" Hover="true" Dense="true" RowsPerPage="50" Elevation="0" Filter="new Func<Job<AccountGenExecutionContext>, bool>(FilterFunc)">
+					<ToolBarContent>
+						<MudChipSet @bind-SelectedChip="_selection" Filter="true">
+							<MudChip Text="@(JobState.CREATED.ToString())" Color="Color.Default">Created</MudChip>
+							<MudChip Text="@(JobState.PROCESSING.ToString())" Color="Color.Info">Processing</MudChip>
+							<MudChip Text="@(JobState.CANCELLED.ToString())" Color="Color.Error">Cancelled</MudChip>
+							<MudChip Text="@(JobState.FINISHED.ToString())" Color="Color.Success">Finished</MudChip>
+						</MudChipSet>
+						<MudToolBarSpacer />
+
+						<MudChip Icon="@Icons.Outlined.Stop" Variant="Variant.Outlined" Disabled="state.Status == RunStatus.FINISHED" OnClick="CancelRemainingJobs" Color="Color.Default">Stop</MudChip>
+					</ToolBarContent>
+
+					<ColGroup>
+						<col />
+						<col style="width: 40%;" />
+						<col style="width: 25%;" />
+						<col />
+					</ColGroup>
+
+					<HeaderContent>
+						<MudTh>State</MudTh>
+						<MudTh>Progression</MudTh>
+						<MudTh>Execution time</MudTh>
+						<MudTh>Actions</MudTh>
+					</HeaderContent>
+
+					<RowTemplate>
+						<MudTd DataLabel="State">
+							@switch (context.State)
+							{
+								case JobState.CREATED:
+									<MudChip Color="Color.Default">@context.State</MudChip>
+									break;
+								case JobState.PROCESSING:
+									<MudChip Color="Color.Info">@context.State</MudChip>
+									break;
+								case JobState.CANCELLED:
+									<MudChip Color="Color.Error">@context.State</MudChip>
+									break;
+								case JobState.FINISHED:
+									<MudChip Color="Color.Success">@context.State</MudChip>
+									break;
+							}
+						</MudTd>
+						<MudTd DataLabel="Description">@GetProgression(context)</MudTd>
+						<MudTd DataLabel="Time">@(context.State != JobState.CREATED ? context.GetExecutionTime().GetReadableTimespan() : "/")</MudTd>
+						<MudTd DataLabel="Actions" Style="text-align: center">
+							@if (!context.IsCancelled)
+							{
+								<MudTooltip Placement="Placement.Top" Text="Cancel task">
+									<MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" OnClick="(() => context.Cancel())"></MudIconButton>
+								</MudTooltip>
+							}
+						</MudTd>
+					</RowTemplate>
+
+					<PagerContent>
+						<MudTablePager />
+					</PagerContent>
+				</MudTable>
+			</MudCardContent>
+		}
+		else
+		{
+			<MudCardContent>
+				<MudSkeleton SkeletonType="SkeletonType.Text" Animation="Animation.Pulse" Class="mb-3" />
+				<MudSkeleton SkeletonType="SkeletonType.Text" Animation="Animation.Pulse" Class="mb-3" />
+				<MudSkeleton SkeletonType="SkeletonType.Text" Animation="Animation.Pulse" Class="mb-3" />
+			</MudCardContent>
+		}
+	</MudCard>
+</MudContainer>
+
+<MudMessageBox @ref="_messageBox" Title="Warning" CancelText="Cancel">
+	<MessageContent>
+		This action will stop all current tasks. Are you sure ?
+	</MessageContent>
+	<YesButton>
+		<MudButton Variant="Variant.Filled" Color="Color.Error">Proceed</MudButton>
+	</YesButton>
+</MudMessageBox>
+
+
+@code {
+	[Parameter]
+	public int Id { get; set; }
+
+	private MudChip _selection;
+	private MudMessageBox _messageBox;
+
+	private List<BreadcrumbItem> _items;
+
+	protected override async Task OnInitializedAsync()
+	{
+		_items = new List<BreadcrumbItem>
+		{
+			new BreadcrumbItem("Generator", href: "/generator"),
+			new BreadcrumbItem("Details", href: $"/generator/details/{Id}")
+		};
+
+		await State.Update(false); // load the State before the first render
+	}
+
+	protected override async Task<PipelineRunInstance> ComputeState(CancellationToken cancellationToken)
+	{
+		return await AccountGenerationManager.GetPipelineInstance(Id);
+	}
+
+	private bool FilterFunc(Job<AccountGenExecutionContext> job)
+	{
+		if (_selection == null)
+			return true;
+
+		if (job.State.ToString() == _selection.Text)
+			return true;
+
+		return false;
+	}
+
+	string GetProgression(Job<AccountGenExecutionContext> job)
+	{
+		return job switch
+		{
+			{ State: JobState.CANCELLED } => string.Empty,
+			{ State: JobState.FINISHED } => string.Empty,
+			{ State: JobState.CREATED } => "Waiting for available slot",
+			{ State: JobState.PROCESSING, CurrentBlock: null } => "Waiting for available slot",
+			{ State: JobState.PROCESSING, CurrentBlock: not null } => $"{job.CurrentBlock.BlockExecutionLog.BlockName} | {job.CurrentBlock.BlockExecutionLog.StepExecution.LastOrDefault()?.StepName}",
+			_ => string.Empty
+		};
+	}
+
+	private async Task CancelRemainingJobs()
+	{
+		var messageBoxResult = await _messageBox.Show(new DialogOptions { MaxWidth = MaxWidth.Small });
+
+		if(messageBoxResult == null || messageBoxResult == false)
+			return;
+
+		var result = await AccountGenerationManager.CancelRemainingJobs(Id);
+
+		if (result.IsFailed)
+		{
+			Snackbar.Add(result.Errors.First().Message, Severity.Error, options =>
+			{
+				options.ActionColor = Color.Primary;
+				options.SnackbarVariant = Variant.Outlined;
+			});
+		}
+
+		InvalidateState();
+	}
+}

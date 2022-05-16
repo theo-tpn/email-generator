@@ -1,0 +1,193 @@
+﻿@using ChartJs.Blazor.BarChart
+@using ChartJs.Blazor.BarChart.Axes
+@using ChartJs.Blazor.Common
+@using ChartJs.Blazor.Common.Axes
+@using ChartJs.Blazor.Common.Axes.Ticks
+@using ChartJs.Blazor.Common.Enums
+@using Stl.Fusion
+@using System.Threading
+@using Noctus.GenWave.Desktop.App.Managers
+@using Stl.Collections
+@using Animation = ChartJs.Blazor.Common.Animation
+
+@inject ExternalServiceManager ExternalServiceManager
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<(BarConfig cfg, List<PhonePrices.Model> prices)>
+
+@{
+	var state = State.LastValue;
+}
+
+<MudCard Elevation="10">
+	<MudCardHeader>
+		<CardHeaderContent>
+			<MudElement HtmlTag="div" class="d-flex mb-3">
+				<MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+				<MudText Typo="Typo.h4" Class="align-self-center flex-grow-1">Phone provider stats | Microsoft</MudText>
+			</MudElement>
+		</CardHeaderContent>
+	</MudCardHeader>
+	<MudCardContent>
+		<MudGrid>
+			<MudItem xs="12" sm="12" md="12" lg="8" Class="d-flex flex-column">
+				<MudText Typo="Typo.h6" Class="mx-auto" GutterBottom="true">Available phones</MudText>
+				@if (state.cfg.Data.Datasets.Any())
+				{
+					<Chart Config="state.cfg" Width="500"></Chart>
+				}
+				else
+				{
+					<MudElement HtmlTag="div" Class="d-flex flex-row align-end justify-space-around" Style="height: 400px">
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="50%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="60%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="20%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="65%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="12%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="80%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="5%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="30%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="90%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="20%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="40%" Style="transform: none!important" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="30px" Height="10%" Style="transform: none!important" />
+					</MudElement>
+				}
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6" lg="4" Class="d-flex flex-column">
+				<MudText Typo="Typo.h6" Class="mx-auto" GutterBottom="true">Prices table</MudText>
+				@if (state.prices.Any())
+				{
+				    <MudTable Items="@(state.prices)" RowsPerPage="5" Hover="true" SortLabel="Sort By" Filter="FilterFunc">
+                        <ToolBarContent>
+                            <MudTextField @bind-Value="pricesSearchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                        </ToolBarContent>
+                        <HeaderContent>
+                            <MudTh>
+                                <MudTableSortLabel SortBy="new Func<Model, string>(x => x.Country)">
+                                    Country
+                                </MudTableSortLabel>
+                            </MudTh>
+                            <MudTh>
+                                <MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<Model, object>(x => x.Price)">
+                                    Price (₽)
+                                </MudTableSortLabel>
+                            </MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Country">@context.Country</MudTd>
+                            <MudTd DataLabel="Price">@context.Price</MudTd>
+                        </RowTemplate>
+                        <PagerContent>
+                            <MudTablePager DisableRowsPerPage="true"/>
+                        </PagerContent>
+                    </MudTable>
+				}
+				else
+				{
+					<MudElement HtmlTag="div">
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="100%" Height="50px" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="60%" Height="50px" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="65%" Height="50px" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="75%" Height="50px" />
+						<MudSkeleton Animation="MudBlazor.Animation.Wave" SkeletonType="SkeletonType.Text" Width="50%" Height="50px" />
+					</MudElement>
+				}
+			</MudItem>
+		</MudGrid>
+	</MudCardContent>
+</MudCard>
+
+@code {
+
+    public record Model(string Country, double Price);
+
+    private readonly BarConfig _config = new()
+    {
+        Options = new BarOptions
+        {
+            Responsive = true,
+            Animation = new Animation {Duration = 0},
+            Title = new OptionsTitle {Display = false},
+            Tooltips = new Tooltips {Position = TooltipPosition.Average},
+            Legend = new Legend {Display = false},
+            Scales = new BarScales
+            {
+                XAxes = new List<CartesianAxis>
+                {
+                    new BarCategoryAxis
+                    {
+                        GridLines = new GridLines
+                        {
+                            Display = false
+                        },
+                        Ticks = new CategoryTicks
+                        {
+                            FontColor = "#f1edff"
+                        }
+                    }
+                },
+                YAxes = new List<CartesianAxis>
+                {
+                    new LinearCartesianAxis
+                    {
+                        GridLines = new GridLines
+                        {
+                            Display = true,
+                            Color = new IndexableOption<string>("#f1edff")
+                        },
+                        Ticks = new LinearCartesianTicks
+                        {
+                            FontColor = "#f1edff",
+                            Max = 4000
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    private string pricesSearchString;
+
+    protected override async Task OnInitializedAsync() => await State.Update(false);
+
+    protected override void ConfigureState(LiveState<(BarConfig, List<Model>)>.Options options)
+    {
+        options.InitialOutputFactory = _ => (_config, new());
+    }
+
+    protected override async Task<(BarConfig, List<Model>)> ComputeState(CancellationToken cancellationToken)
+    {
+        var dictionary = await ExternalServiceManager.GetSmsLivePrice();
+
+        var datasetAvailablePhones = new BarDataset<int>(dictionary.Values.Select(x => x.AvailablePhones))
+        {
+            Label = "Available phones",
+            BackgroundColor = new IndexableOption<string>("rgba(255,172,114,1)")
+        };
+
+        _config.Data.Datasets.Clear();
+        _config.Data.Labels.Clear();
+
+        _config.Data.Datasets.Add(datasetAvailablePhones);
+        _config.Data.Labels.AddRange(dictionary.Keys.Select(x => x.ToString()));
+
+        var list = new List<Model>();
+        foreach (var (k, v) in dictionary)
+        {
+            list.Add(new Model(k.ToString(), v.Price));
+        }
+
+        InvalidateState();
+        return (_config, list);
+    }
+
+    private bool FilterFunc(Model elem)
+    {
+        if (string.IsNullOrWhiteSpace(pricesSearchString))
+            return true;
+        if (elem.Country.Contains(pricesSearchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+}

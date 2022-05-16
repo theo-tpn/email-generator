@@ -1,0 +1,96 @@
+﻿@using Noctus.GenWave.Desktop.App.Managers
+@using Noctus.Domain
+@using Noctus.Domain.Entities
+@using System.Threading
+@using Stl.Fusion
+@using System.ComponentModel.DataAnnotations
+@using ElectronNET.API
+
+@inject ExternalServiceManager ExternalServiceManager
+@inject ISnackbar Snackbar
+@inherits Stl.Fusion.Blazor.LiveComponentBase<ApiKeyStatus, ExternalServicesForm.Model>
+
+@{
+	var state = State.LastValue;
+	var locals = Locals.Value;
+}
+
+<EditForm Model="@locals" OnValidSubmit="Save">
+	<DataAnnotationsValidator />
+
+	<MudElement Class="mb-6 d-flex justify-end" HtmlTag="div">
+		<MudChip Icon="@Icons.Outlined.Web" Variant="Variant.Outlined" Color="Color.Info" OnClick="@(() => OpenBrowser(Service.Website))">Web</MudChip>
+		@if (_showForm)
+		{
+			<MudChip Icon="@Icons.Outlined.Cancel" Variant="Variant.Outlined" Color="Color.Error" OnClick="ToggleShowForm">Cancel</MudChip>
+		}
+		else
+		{
+			<MudChip Icon="@Icons.Outlined.Edit" Variant="Variant.Outlined" OnClick="ToggleShowForm" Color="Color.Default">Edit</MudChip>
+		}
+	</MudElement>
+
+	<MudElement Class="mb-6" HtmlTag="div">
+		<MudTextField @bind-Value="@locals.Key" For="() => locals.Key" Disabled="@(!_showForm)" Label="License key" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@(state == ApiKeyStatus.Ok ? Icons.Material.Filled.Verified : Icons.Material.Filled.Error)" AdornmentColor="@(state == ApiKeyStatus.Ok ? Color.Success : Color.Error)" />
+	</MudElement>
+
+	@if (_showForm)
+	{
+		<MudElement Class="mb-6 d-flex justify-center" HtmlTag="div">
+			<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px" StartIcon="@Icons.Material.Outlined.Save" Size="Size.Medium">
+				Save
+			</MudButton>
+		</MudElement>
+	}
+</EditForm>
+
+
+@code {
+	[Parameter] public string Value { get; set; }
+	[Parameter] public ExternalService Service { get; set; }
+	[Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+	public class Model
+	{
+		[Required]
+		public string Key { get; set; }
+	}
+
+	private bool _showForm;
+
+	private void ToggleShowForm()
+	{
+		_showForm = !_showForm;
+	}
+
+	private async Task Save()
+	{
+		var locals = Locals.Value;
+		ResourcesHelper.AddOrUpdateSetting(GetSettingKey(Service), locals.Key);
+		Snackbar.Add("Settings updated", Severity.Info);
+		InvalidateState();
+		_showForm = false;
+		await ValueChanged.InvokeAsync(locals.Key);
+	}
+
+	protected override void ConfigureLocals(MutableState<Model>.Options options) =>
+		options.InitialOutputFactory = _ => new Model { Key = Value };
+
+	protected override async Task<ApiKeyStatus> ComputeState(CancellationToken cancellationToken)
+	{
+		return await ExternalServiceManager.ApiKeyHealthCheck(Service, Locals.Value.Key);
+	}
+
+	private string GetSettingKey(ExternalService service)
+		=> service switch
+		{
+			var x when x == ExternalService.TwoCaptcha => "ExternalServices:TwoCaptchaApiKey",
+			var x when x == ExternalService.SmsActivateRu => "ExternalServices:SmsActivateRuApiKey",
+			_ => throw new ArgumentOutOfRangeException(nameof(service), service, null)
+		};
+
+	private async Task OpenBrowser(string link)
+	{
+		await Electron.Shell.OpenExternalAsync(link);
+	}
+}

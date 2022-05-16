@@ -1,0 +1,36 @@
+﻿@using System.Threading
+@using Noctus.GenWave.Desktop.App.Managers
+@using Stl.Fusion
+@inherits Stl.Fusion.Blazor.LiveComponentBase<Noctus.Domain.Models.AccountGenBucket>
+@inject AccountGenerationManager AccountGenerationManager
+
+@{
+	var state = State.LastValue;
+}
+
+<MudCard Elevation="10" Class="px-8" Style="background: var(--card-gradient-5)">
+	<MudCardHeader Class="pb-0">
+		<CardHeaderContent>
+			<MudElement HtmlTag="div" Class="d-flex">
+				<MudText Typo="Typo.h4" Class="align-self-center flex-grow-1">My bucket</MudText>
+			</MudElement>
+		</CardHeaderContent>
+	</MudCardHeader>
+	<MudCardContent>
+		<MudText Typo="Typo.h6">@state.CurrentStock / @state.MaximumStock available</MudText>
+	</MudCardContent>
+</MudCard>
+
+
+@code {
+
+	protected override async Task OnInitializedAsync()
+	{
+		await State.Update(false);
+	}
+
+	protected override async Task<AccountGenBucket> ComputeState(CancellationToken cancellationToken)
+	{
+		return await AccountGenerationManager.GetAccountGenBucket();
+	}
+}

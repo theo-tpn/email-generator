@@ -1,0 +1,173 @@
+﻿@page "/accounts"
+
+@using System.Threading
+@using Castle.Core.Internal
+@using ElectronNET.API
+@using Noctus.Domain.Interfaces.Repositories
+@using Noctus.GenWave.Desktop.App.Services
+@using Stl.Fusion
+@inject IAccountSetRepository AccountSetRepository
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService 
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<IEnumerable<AccountSetEntity>>
+
+@{
+	var state = State.LastValue;
+}
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="pt-8 pb-8">
+	<MudGrid Spacing="4" Class="mt-4">
+		<MudItem xs="12">
+			<MudCard Elevation="10">
+				<MudCardHeader>
+					<CardHeaderContent>
+						<MudElement HtmlTag="div" class="d-flex mb-3">
+							<MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+							<MudText Typo="Typo.h4" Class="align-self-center flex-grow-1">Accounts</MudText>
+							<MudElement HtmlTag="div" Class="align-self-center">
+								<MudChip Icon="@Icons.Outlined.GroupAdd" Variant="Variant.Outlined" OnClick="ImportAccounts">Import existing set</MudChip>
+							</MudElement>
+						</MudElement>
+					</CardHeaderContent>
+				</MudCardHeader>
+				<MudCardContent>
+					<MudTable Items="@state" T="AccountSetEntity" Dense="true" Hover="true" Filter="new Func<AccountSetEntity, bool>(FilterFunc)" OnRowClick="@(args => OnRowClick(args))" RowStyle="cursor: pointer;" RowsPerPage="50" Elevation="0">
+						<ToolBarContent>
+							<MudToolBarSpacer />
+							<MudToolBarSpacer />
+							<MudTextField @bind-Value="_searchQuery" Placeholder="Search"
+										  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+										  IconSize="Size.Medium"></MudTextField>
+						</ToolBarContent>
+						<ColGroup>
+							<col />
+							<col style="width: 30%" />
+							<col style="width: 20%" />
+							<col />
+							<col style="width: 20%" />
+						</ColGroup>
+						<HeaderContent>
+							<MudTh>Provider</MudTh>
+							<MudTh>Name</MudTh>
+							<MudTh>Accounts generated</MudTh>
+							<MudTh>Date</MudTh>
+							<MudTh></MudTh>
+						</HeaderContent>
+						<RowTemplate>
+							<MudTd DataLabel="Type">@context.Provider</MudTd>
+							<MudTd DataLabel="Name" Class="truncate-text">@context.Name</MudTd>
+							<MudTd DataLabel="Accounts" Style="text-align: center">@context.Accounts.Count</MudTd>
+							<MudTd DataLabel="Date">@context.CreateDate.ToString("g")</MudTd>
+							<MudTd DataLabel="Actions" Style="text-align: right">
+								<MudTooltip Placement="Placement.Top" Text="Export as CSV">
+									<MudIconButton Icon="@Icons.Custom.FileFormats.FileExcel" Size="Size.Medium" OnClick="() => ExportToCsv(context.Id)" />
+								</MudTooltip>
+								<MudTooltip Placement="Placement.Top" Text="Details">
+									<MudIconButton Icon="@Icons.Outlined.ReadMore" Size="Size.Medium" OnClick="() => NavigateToDetails(context.Id)" />
+								</MudTooltip>
+								<MudTooltip Placement="Placement.Top" Text="Delete">
+									<MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="() => DeleteItem(context.Id)" Disabled="context.IsInLockedState"></MudIconButton>
+								</MudTooltip>
+							</MudTd>
+						</RowTemplate>
+						<PagerContent>
+							<MudTablePager />
+						</PagerContent>
+					</MudTable>
+				</MudCardContent>
+			</MudCard>
+		</MudItem>
+	</MudGrid>
+</MudContainer>
+
+
+<MudMessageBox @ref="_messageBox" Title="Warning" CancelText="Cancel">
+	<MessageContent>
+		This action will delete this item. Are you sure ?
+	</MessageContent>
+	<YesButton>
+		<MudButton Variant="Variant.Filled" Color="Color.Error">Proceed</MudButton>
+	</YesButton>
+</MudMessageBox>
+
+
+@code
+{
+	private MudMessageBox _messageBox;
+	private string _searchQuery;
+
+	protected override void ConfigureState(LiveState<IEnumerable<AccountSetEntity>>.Options options) =>
+		options.InitialOutputFactory = _ => new List<AccountSetEntity>();
+
+	protected override async Task<IEnumerable<AccountSetEntity>> ComputeState(CancellationToken cancellationToken)
+	{
+		return await AccountSetRepository.Get();
+	}
+
+	private void NavigateToDetails(int id)
+	{
+		NavigationManager.NavigateTo($"/accounts/details/{id}");
+	}
+
+	private void OnRowClick(TableRowClickEventArgs<AccountSetEntity> el)
+	{
+		NavigationManager.NavigateTo($"/accounts/details/{el.Item.Id}");
+	}
+
+	private bool FilterFunc(AccountSetEntity element)
+	{
+		if (element.Name.IsNullOrEmpty() || string.IsNullOrEmpty(_searchQuery))
+			return true;
+
+		return element.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private async Task DeleteItem(int id)
+	{
+		var messageBoxResult = await _messageBox.Show(new DialogOptions {MaxWidth = MaxWidth.Small});
+
+		if (messageBoxResult == null || messageBoxResult == false)
+			return;
+
+		if (AccountSetRepository.Delete(id))
+		{
+			Snackbar.Add("Item deleted", Severity.Success);
+		}
+		else
+		{
+			Snackbar.Add("Error", Severity.Error);
+		}
+	}
+
+	private async Task ExportToCsv(int id)
+	{
+		var set = await AccountSetRepository.Find(id);
+		var service = new CsvExportService();
+
+		var result = await service.ExportAccounts(set.Name, set.Accounts);
+
+		if (result.IsFailed)
+		{
+			Snackbar.Add("Error while creating file", Severity.Error);
+		}
+		else
+		{
+			Snackbar.Add($"CSV file created at {result.Value}", Severity.Success,
+				options =>
+				{
+					options.Onclick = _ => Electron.Shell.OpenPathAsync(result.Value);
+					options.Action = "Open";
+				});
+		}
+	}
+
+	private void ImportAccounts()
+	{
+		DialogService.Show<ImportAccounts>("Add accounts", new DialogParameters
+		{
+			["Id"] = 0
+		});
+	}
+}

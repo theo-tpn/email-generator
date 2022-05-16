@@ -1,0 +1,93 @@
+﻿@using ChartJs.Blazor.LineChart
+@using System.Threading
+@using ChartJs.Blazor.Common
+@using ChartJs.Blazor.Common.Axes
+@using ChartJs.Blazor.Common.Axes.Ticks
+@using ChartJs.Blazor.Common.Enums
+@using ChartJs.Blazor.Common.Time
+@using Noctus.GenWave.Desktop.App.Managers
+@using Stl.Collections
+@using Stl.Fusion
+@using Animation = ChartJs.Blazor.Common.Animation
+@inject PerformanceRecorder PerformanceRecorder
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<(ChartJs.Blazor.LineChart.LineConfig cfg, float value)>
+
+@{
+	var state = State.LastValue;
+}
+
+<MudElement HtmlTag="div" Class="d-flex flex-column align-center">
+	<div style="width: 150px">
+		<Chart Config="state.cfg" Width="100" />
+	</div>
+	<MudText Typo="Typo.caption">CPU: @state.value.ToString("###.##") %</MudText>
+</MudElement>
+
+@code {
+	private readonly LineConfig _configChart = new()
+	{
+		Options = new LineOptions
+		{
+			Responsive = true,
+			Animation = new Animation {Duration = 0},
+			Legend = new Legend { Display = false},
+			Tooltips = new Tooltips { Enabled = false},
+			Scales = new Scales
+			{
+				XAxes = new List<CartesianAxis>
+				{
+					new TimeAxis
+					{
+						Ticks = new TimeTicks
+						{
+							Source = TickSource.Labels,
+							Display = false
+						},
+						Time = new TimeOptions
+						{
+							TooltipFormat = "HH:mm:ss"
+						}
+					}
+				},
+				YAxes = new List<CartesianAxis>
+				{
+					new LinearCartesianAxis
+					{
+						Ticks = new LinearCartesianTicks
+						{
+							Max = 100,
+							Min = 0,
+							Display = false
+						}
+					}
+				}
+			}
+		}
+	};
+
+	protected override async Task OnInitializedAsync() => await State.Update(false);
+
+	protected override void ConfigureState(LiveState<(LineConfig, float)>.Options options) =>
+		options.InitialOutputFactory = _ => (_configChart, 0);
+
+	protected override async Task<(LineConfig, float)> ComputeState(CancellationToken cancellationToken)
+	{
+		var perfs = await PerformanceRecorder.Get();
+
+		var cpu = new LineDataset<float>(perfs.Select(x => x.Cpu))
+		{
+			BackgroundColor = "rgba(102, 251, 189, 1)",
+			Fill = FillingMode.Start,
+			PointRadius = 0
+		};
+		
+		_configChart.Data.Datasets.Clear();
+		_configChart.Data.Labels.Clear();
+		_configChart.Data.Datasets.Add(cpu);
+		_configChart.Data.Labels.AddRange(perfs.Select(x => x.Date.ToString("O")));
+
+		InvalidateState();
+		return (_configChart, perfs.Select(x => x.Cpu).LastOrDefault());
+	}
+}

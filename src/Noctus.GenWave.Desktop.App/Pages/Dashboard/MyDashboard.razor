@@ -1,0 +1,39 @@
+﻿@page "/"
+@using Noctus.GenWave.Desktop.App.Managers
+@using Microsoft.Extensions.Options
+@inject AppManager AppManager
+@inject IOptionsMonitor<UserSettings> UserSettings
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8 pb-8">
+	<MudGrid>
+		@if (string.IsNullOrEmpty(UserSettings.CurrentValue.ExternalServices.SmsActivateRuApiKey) 
+		     || string.IsNullOrEmpty(UserSettings.CurrentValue.ExternalServices.TwoCaptchaApiKey))
+		{
+			<MudItem xs="12" sm="12" md=12>
+				<MudAlert Severity="Severity.Error" Variant="Variant.Filled">Looks like you did not set your 2captcha/sms-ru key. Please go to your settings <MudLink Underline="Underline.Always" Href="/settings">page</MudLink></MudAlert>
+			</MudItem>
+		}
+
+		<MudItem xs="12" sm="6" md="4">
+			<ExternalServiceBalance Service="ExternalService.TwoCaptcha" Style="background: var(--card-gradient)" />
+		</MudItem>
+
+		<MudItem xs="12" sm="6" md="4">
+			<ExternalServiceBalance Service="ExternalService.SmsActivateRu" Style="background: var(--card-gradient-2)" />
+		</MudItem>
+
+        <MudItem sm="6" md="4">
+			<AccountsOverviewCard></AccountsOverviewCard>
+        </MudItem>
+        
+		<MudItem xs="12" sm="12" md="12">
+			<PhonePrices />
+		</MudItem>
+	</MudGrid>
+</MudContainer>
+
+
+@code
+{
+
+}

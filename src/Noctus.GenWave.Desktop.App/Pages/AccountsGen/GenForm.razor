@@ -1,0 +1,223 @@
+﻿@using Noctus.Genwave.Desktop.App.Models
+@using Noctus.GenWave.Desktop.App.Managers
+@using Noctus.Application
+@using Microsoft.Extensions.Options
+@using Noctus.Domain.Models.Sms
+@using System.Threading
+@using System.Collections.Immutable
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<GenForm.Model, AccountGenerationDto>
+
+@inject ProxyManager ProxyService
+@inject RecoveryEmailManager RecoveryEmailManager
+@inject IOptionsMonitor<UserSettings> UserSettings
+@inject AccountGenerationManager AccountGenerationManager
+@inject ExternalServiceManager ExternalServiceManager 
+
+@{
+	var state = State.LastValue;
+}
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">Configure your generation</MudText>
+	</TitleContent>
+	<DialogContent>
+		<MudContainer Class="d-flex align-center" MaxWidth="MaxWidth.ExtraLarge" Style="height: 80vh;">
+			<EditForm OnValidSubmit="OnValidSubmit" EditContext="_ctx">
+				<DataAnnotationsValidator />
+				<MudGrid Class="d-flex flex-row">
+					<MudItem md="7" Class="d-flex flex-column" Style="overflow: hidden">
+						<MudElement HtmlTag="div" Class="pa-3" Style="overflow-y: auto;max-height: 70vh;">
+							<MudGrid>
+								<MudItem xs="3">
+									<MudTextField T="int" @bind-Value="_model.TasksAmount" Label="Tasks" Variant="Variant.Outlined"
+												  For="@(() => _model.TasksAmount)"></MudTextField>
+								</MudItem>
+								<MudItem xs="3">
+									<MudTextField @bind-Value="_model.Parallelism" Label="Parallelism" HelperText="Set how many task can be processed at the same time" Variant="Variant.Outlined"
+												  For="@(() => _model.Parallelism)"></MudTextField>
+								</MudItem>
+								<MudItem xs="6">
+									<MudSelect T="ModuleType" Label="Module" Strict="true" Variant="Variant.Outlined" MultiSelection="false"
+											   @bind-Value="_model.Module" For="@(() => _model.Module)">
+										@foreach (var type in Enum.GetValues<ModuleType>())
+										{
+											<MudSelectItem Value="@(type)">@type.ToString()</MudSelectItem>
+										}
+									</MudSelect>
+								</MudItem>
+
+								<MudItem xs="6">
+									<MudSelect T="SmsCountryCode" Label="Account country" Strict="true" Variant="Variant.Outlined" MultiSelection="false"
+											   @bind-Value="_model.AccountCountryCode" For="@(() => _model.AccountCountryCode)">
+										@foreach (var country in Enum.GetValues<SmsCountryCode>())
+										{
+											<MudSelectItem Value="@country" />
+										}
+									</MudSelect>
+								</MudItem>
+								<MudItem xs="6">
+									<MudSelect T="SmsCountryCode" Label="Phone country" Strict="true" Variant="Variant.Outlined" MultiSelection="false" @bind-Value="_model.PhoneCountryCode" For="@(() => _model.PhoneCountryCode)">
+										@foreach (var (country, price) in state.Phones)
+										{
+											<MudSelectItem Value="@country" Disabled="@(price.AvailablePhones == 0)">@country <span style="float: right; font-size: 14px;">@price.AvailablePhones @@ ₽@price.Price</span></MudSelectItem>
+										}
+									</MudSelect>
+								</MudItem>
+
+								<MudItem xs="6">
+									<MudSelect T="int" Label="Proxies" Strict="true" Variant="Variant.Outlined" MultiSelection="false"
+											   @bind-Value="_model.ProxiesSetId" For="@(() => _model.ProxiesSetId)">
+										<MudSelectItem Value="-1">Do not use proxies</MudSelectItem>
+										@foreach (var key in state.Proxies)
+										{
+											<MudSelectItem Value="@key.Id">@key.Name</MudSelectItem>
+										}
+									</MudSelect>
+								</MudItem>
+								<MudItem xs="6">
+									<MudTextField T="string" Label="List name" @bind-Value="_model.OutputName" HelperText="Name for your list, default is current datetime" Variant="Variant.Outlined" For="@(() => _model.OutputName)" />
+								</MudItem>
+
+								<MudItem xs="6" sm="6" md="6">
+									<MudTextField T="string" @bind-Value="_model.MasterFw" Label="Forward email" Variant="Variant.Outlined"
+												  For="@(() => _model.MasterFw)"></MudTextField>
+								</MudItem>
+								<MudItem xs="6">
+								</MudItem>
+								<MudItem xs="3">
+									<MudCheckBox @bind-Checked="@_model.RegisterToNewsletter" Label="Register to newsletters" Color="Color.Primary"></MudCheckBox>
+								</MudItem>
+								<MudItem xs="3">
+									<MudCheckBox @bind-Checked="@_model.UseHarvestedCookies" For="@(() => _model.UseHarvestedCookies)" Label="Use Harvested Cookies" Color="Color.Primary"></MudCheckBox>
+								</MudItem>
+								<MudItem xs="3">
+									<MudCheckBox @bind-Checked="@_model.EnableEmailRecoveryVerification" For="@(() => _model.EnableEmailRecoveryVerification)" Label="Enable Email Verification" Color="Color.Primary" Disabled="!_canUseRecoveryEmailFlow"></MudCheckBox>
+								</MudItem>
+								<MudItem xs="3">
+									<MudCheckBox @bind-Checked="@_model.EnablePhoneNumberVerification" For="@(() => _model.EnablePhoneNumberVerification)" Label="Enable Phone Verification" Color="Color.Primary"></MudCheckBox>
+								</MudItem>
+								<MudItem xs="12" Class="@(_advancedFormHidden ? "d-none" : "")">
+									<MudGrid>
+										<MudItem xs="12">
+											<MudDivider DividerType="DividerType.Middle" />
+										</MudItem>
+										<MudItem xs="5">
+											<MudTextField T="string" @bind-Value="_model.CustomPassword" Label="Account password" HelperText="If specified, set a unique password for every account generated" Variant="Variant.Outlined"
+														  For="@(() => _model.CustomPassword)"></MudTextField>
+										</MudItem>
+										<MudItem xs="3">
+											<MudTextField @bind-Value="_model.JobTimeoutInMinutes" Label="Task timeout" HelperText="Set a timeout in minutes before a task automatically cancel" Variant="Variant.Outlined"
+														  For="@(() => _model.JobTimeoutInMinutes)"></MudTextField>
+										</MudItem>
+									</MudGrid>
+								</MudItem>
+								<MudItem xs="12" Class="d-flex justify-end">
+									<MudLink @onclick="ToggleAdvancedForm" Underline="Underline.Always" Style="cursor: pointer">@(_advancedFormHidden ? "Show" : "Hide") advanced options</MudLink>
+								</MudItem>
+							</MudGrid>
+						</MudElement>
+
+						<MudElement HtmlTag="div" Class="d-flex justify-center mt-4">
+							<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" StartIcon="@Icons.Material.Filled.PlayArrow" Size="Size.Large">Start</MudButton>
+						</MudElement>
+					</MudItem>
+
+					<MudDivider DividerType="DividerType.Middle" FlexItem="true" Vertical="true" Class="mx-lg-12 mx-md-6" />
+
+					<MudItem md="4" Class="d-flex flex-column justify-center">
+						<MudText Typo="Typo.h6" GutterBottom="true">Price estimation</MudText>
+						<MudText Typo="Typo.body2" Class="mb-6">This is just informative. You are still able to start the generation. But if your funds become insufficient when generating, errors may occur.</MudText>
+						@if (!state.EstimationRecords.Any())
+						{
+							<MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Class="mb-3"></MudSkeleton>
+							<MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle"></MudSkeleton>
+						}
+						else
+						{
+							@foreach (var (externalService, estimatedPrice, balance) in state.EstimationRecords)
+							{
+								var validity = balance > estimatedPrice;
+								<MudElement HtmlTag="div" Class="mb-3">
+									<MudAlert Severity="@(validity ? Severity.Success : Severity.Warning)" Class="align-center">
+										<MudText>@externalService.Label: <span>@externalService.Symbol</span>@estimatedPrice</MudText>
+										<MudText Typo="Typo.caption"><span>@externalService.Symbol</span>@balance available</MudText>
+									</MudAlert>
+								</MudElement>
+							}
+						}
+					</MudItem>
+				</MudGrid>
+			</EditForm>
+		</MudContainer>
+	</DialogContent>
+	<DialogActions></DialogActions>
+</MudDialog>
+
+@code
+{
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	private AccountGenerationDto _model;
+	private bool _advancedFormHidden = true;
+	private bool _canUseRecoveryEmailFlow;
+	private EditContext _ctx;
+
+	public record Model
+	{
+		public IEnumerable<ProxiesSetEntity> Proxies { get; init; } = new List<ProxiesSetEntity>();
+		public Dictionary<SmsCountryCode, SmsPriceAvailability> Phones { get; init; } = new();
+		public ImmutableList<EstimatedPricesRecord> EstimationRecords = ImmutableList<EstimatedPricesRecord>.Empty;
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		var recoveryEmails = await RecoveryEmailManager.GetRecoveryEmails();
+		_canUseRecoveryEmailFlow = recoveryEmails.Any();
+
+		_model = new AccountGenerationDto
+		{
+			MasterFw = UserSettings.CurrentValue.AccountsGeneration.DefaultMasterEmail,
+			CustomPassword = UserSettings.CurrentValue.AccountsGeneration.DefaultPassword,
+			EnableEmailRecoveryVerification = _canUseRecoveryEmailFlow,
+			EnablePhoneNumberVerification = !_canUseRecoveryEmailFlow,
+			TasksAmount = UserSettings.CurrentValue.AccountsGeneration.DefaultTasksNumber,
+			Parallelism = UserSettings.CurrentValue.AccountsGeneration.DefaultParallelTaskNumber
+		};
+
+		Locals.Value = _model;
+
+		_ctx = new EditContext(_model);
+		_ctx.OnFieldChanged += (_, _) =>
+		{
+			Locals.Set(Locals.AsResult());
+		};
+	}
+
+	private void ToggleAdvancedForm()
+	{
+		_advancedFormHidden = !_advancedFormHidden;
+	}
+
+	private void OnValidSubmit(EditContext context)
+	{
+		MudDialog.Close(DialogResult.Ok(_model));
+	}
+
+	protected override async Task<GenForm.Model> ComputeState(CancellationToken cancellationToken)
+	{
+		var value = Locals.Value;
+		var proxies = await ProxyService.GetProxiesBucket();
+		var externalPrices = await ExternalServiceManager.GetSmsLivePrice();
+		var estimationRecords = await AccountGenerationManager.Estimate(value.TasksAmount, value.UseHarvestedCookies, 
+			value.PhoneCountryCode, value.EnablePhoneNumberVerification, value.EnableEmailRecoveryVerification);
+
+		return new Model
+		{
+			Proxies = proxies,
+			Phones = externalPrices,
+			EstimationRecords = estimationRecords
+		};
+	}
+}

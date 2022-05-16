@@ -1,0 +1,150 @@
+﻿@using Noctus.Domain
+@using InputType = MudBlazor.InputType
+@using System.ComponentModel.DataAnnotations
+
+@inject ISnackbar Snackbar
+
+<MudCard Elevation="10">
+	<MudCardHeader>
+		<CardHeaderContent>
+			<MudElement HtmlTag="div" Class="d-flex mb-3">
+				<MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+				<MudText Typo="Typo.h4" Class="align-self-center flex-grow-1">Generator</MudText>
+				<MudElement HtmlTag="div" Class="align-self-center">
+					@if (_showForm)
+					{
+						<MudChip Icon="@Icons.Outlined.Cancel" Variant="Variant.Outlined" Color="Color.Error" OnClick="Cancel">Cancel</MudChip>
+					}
+					else
+					{
+						<MudChip Icon="@Icons.Outlined.Edit" Variant="Variant.Outlined" OnClick="ToggleShowForm" Color="Color.Default">Edit</MudChip>
+					}
+				</MudElement>
+			</MudElement>
+		</CardHeaderContent>
+	</MudCardHeader>
+	<MudCardContent Class="px-16">
+		<EditForm Model="@_model" OnValidSubmit="Save">
+			<DataAnnotationsValidator />
+			<MudElement Class="mb-6" HtmlTag="div">
+				<MudTextField T="int" Label="Tasks amount" HelperText="Set a default value for tasks amount in the generator form" Variant="Variant.Outlined" @bind-Value="_model.TaskNumber" For="() => _model.TaskNumber" Disabled="@(!_showForm)" />
+			</MudElement>
+
+			<MudElement Class="mb-6" HtmlTag="div">
+				<MudTextField T="int" Label="Parallelism" HelperText="Set a default value for parallism in the generator form" Variant="Variant.Outlined" @bind-Value="_model.Parallelism" For="() => _model.Parallelism" Disabled="@(!_showForm)" />
+			</MudElement>
+
+			<MudElement Class="mb-6" HtmlTag="div">
+				<MudTextField T="string" Label="Forward email" HelperText="Set a default value for forward email in the generator form" Variant="Variant.Outlined" @bind-Value="_model.Email" For="() => _model.Email" Disabled="@(!_showForm)" />
+			</MudElement>
+
+			<MudElement Class="mb-6" HtmlTag="div">
+				<MudTextField T="string" Label="Account password" HelperText="Set a default value for account password in the generator form" Variant="Variant.Outlined" @bind-Value="_model.Password" Disabled="@(!_showForm)" Adornment="Adornment.End" InputType="@_passwordInput" AdornmentIcon="@_passwordInputIcon" OnAdornmentClick="TogglePassword"/>
+			</MudElement>
+			@if (_showForm)
+			{
+				<MudElement Class="mb-6 d-flex justify-center" HtmlTag="div">
+					<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px" StartIcon="@Icons.Material.Outlined.Save" Size="Size.Medium">
+						Save
+					</MudButton>
+				</MudElement>
+			}
+		</EditForm>
+	</MudCardContent>
+</MudCard>
+
+@code
+{
+	[Parameter] public AccountsGenerationSettings Settings { get; set; }
+	[Parameter] public EventCallback<AccountsGenerationSettings> SettingsChanged { get; set; }
+
+	public class Model
+	{
+		[EmailAddress]
+		public string Email { get; set; }
+
+		public string Password { get; set; }
+
+		[Range(1, 100)]
+		public int TaskNumber { get; set; }
+
+		[Range(1, 4)]
+		public int Parallelism { get; set; }
+	}
+
+	private Model _model { get; set; }
+	private Model _clone { get; set; }
+
+	private bool _showForm;
+	private InputType _passwordInput = InputType.Password;
+	private string _passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+	private bool _showPassword;
+
+	protected override void OnInitialized()
+	{
+		_model = new Model
+		{
+			Parallelism = Settings.DefaultParallelTaskNumber,
+			Password = Settings.DefaultPassword,
+			Email = Settings.DefaultMasterEmail,
+			TaskNumber = Settings.DefaultTasksNumber
+		};
+
+		_clone = new Model
+		{
+			Parallelism = Settings.DefaultParallelTaskNumber,
+			Password = Settings.DefaultPassword,
+			Email = Settings.DefaultMasterEmail,
+			TaskNumber = Settings.DefaultTasksNumber
+		};
+	}
+
+	private void TogglePassword()
+	{
+		if (_showPassword)
+		{
+			_showPassword = false;
+			_passwordInputIcon = Icons.Material.Filled.VisibilityOff;
+			_passwordInput = InputType.Password;
+		}
+		else
+		{
+			_showPassword = true;
+			_passwordInputIcon = Icons.Material.Filled.Visibility;
+			_passwordInput = InputType.Text;
+		}
+	}
+
+	private void ToggleShowForm()
+	{
+		_showForm = !_showForm;
+	}
+
+	private void Cancel()
+	{
+		_showForm = false;
+		_model.Email = _clone.Email;
+		_model.Parallelism = _clone.Parallelism;
+		_model.Password = _clone.Password;
+		_model.TaskNumber = _clone.TaskNumber;
+	}
+
+	private async Task Save()
+	{
+		Settings.DefaultMasterEmail = _model.Email;
+		Settings.DefaultPassword = _model.Password;
+		Settings.DefaultTasksNumber = _model.TaskNumber;
+		Settings.DefaultParallelTaskNumber = _model.Parallelism;
+		
+		ResourcesHelper.AddOrUpdateSetting("AccountsGeneration", Settings);
+		Snackbar.Add("Settings updated", Severity.Info);
+
+		_showForm = false;
+		_clone.Email = _model.Email;
+		_clone.Parallelism = _model.Parallelism;
+		_clone.Password = _model.Password;
+		_clone.TaskNumber = _model.TaskNumber;
+
+		await SettingsChanged.InvokeAsync(Settings);
+	}
+}

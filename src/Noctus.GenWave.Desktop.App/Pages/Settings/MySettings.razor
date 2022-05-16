@@ -1,0 +1,50 @@
+﻿@page "/settings"
+
+@using Microsoft.Extensions.Options
+
+@inject IOptionsMonitor<UserSettings> UserSettings
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pt-8 pb-8">
+	<MudGrid Spacing="4">
+		<MudItem xs="12">
+			<GeneratorSettingsForm @bind-Settings="@(Settings.AccountsGeneration)" />
+		</MudItem>
+        <MudItem xs="12">
+			<RecoveryEmailSettings></RecoveryEmailSettings>
+        </MudItem>
+		<MudItem xs="12">
+			<MudCard Elevation="10">
+				<MudCardHeader>
+					<CardHeaderContent>
+						<MudElement HtmlTag="div" class="d-flex mb-3">
+							<MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+							<MudText Typo="Typo.h4" Class="align-self-center">External services</MudText>
+						</MudElement>
+					</CardHeaderContent>
+				</MudCardHeader>
+				<MudCardContent Class="px-16">
+					<MudTabs Centered="true" PanelClass="mt-8">
+						<MudTabPanel Text="2captcha">
+							<ExternalServicesForm @bind-Value="@(Settings.ExternalServices.TwoCaptchaApiKey)"
+													   Service="ExternalService.TwoCaptcha" />
+						</MudTabPanel>
+						<MudTabPanel Text="sms-ru">
+							<ExternalServicesForm @bind-Value="@(Settings.ExternalServices.SmsActivateRuApiKey)"
+													   Service="ExternalService.SmsActivateRu" />
+						</MudTabPanel>
+					</MudTabs>
+				</MudCardContent>
+			</MudCard>
+		</MudItem>
+	</MudGrid>
+</MudContainer>
+
+@code 
+{
+	private UserSettings Settings { get; set; }
+
+	protected override void OnInitialized()
+	{
+		Settings = UserSettings.CurrentValue;
+	}
+}

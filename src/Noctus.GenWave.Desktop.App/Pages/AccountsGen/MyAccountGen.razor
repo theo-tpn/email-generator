@@ -1,0 +1,158 @@
+﻿@page "/generator"
+@using Noctus.GenWave.Desktop.App.Managers
+@using System.Threading
+@using Noctus.Genwave.Desktop.App.Models
+@using Microsoft.Extensions.Options
+@using Noctus.Application
+@using Noctus.Infrastructure
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<List<Noctus.Application.PipelineRunInstance>>
+@inject AccountGenerationManager AccountGenerationManager
+@inject ProxyManager ProxyManager
+@inject IOptionsMonitor<UserSettings> UserSettings
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+@{
+    var state = State.LastValue;
+    var error = State.Error;
+}
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8 pb-8">
+    <MudGrid Spacing="4">
+        <MudItem xs="8">
+            <MudElement HtmlTag="div" class="d-flex mb-3">
+                <MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+                <MudText Typo="Typo.h4" Class="align-self-center">Session runs</MudText>
+                <MudIconButton Icon="@Icons.Outlined.AddCircle" Size="Size.Medium" Color="Color.Primary" Class="ml-4 align-self-center" OnClick="ToggleForm" Disabled="state.Any(x => x.Status == RunStatus.PROCESSING)" />
+            </MudElement>
+
+            @if (state.Any())
+            {
+                foreach (var pipelineRunInstance in state)
+                {
+                    <MudCard Elevation="10" Class="pa-2 mb-4">
+                        <MudCardContent>
+                            <MudGrid Justify="Justify.Center">
+                                <MudItem xs="1" Class="d-flex align-center">
+                                    @if (pipelineRunInstance.Status == RunStatus.FINISHED)
+                                    {
+                                        <MudIcon Icon="@Icons.Filled.CheckCircle" Color="Color.Success" Size="Size.Medium" />
+                                    }
+                                    else
+                                    {
+                                        <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
+                                    }
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudElement HtmlTag="div" Class="d-flex">
+                                        <MudText Typo="Typo.h6">@pipelineRunInstance.Type</MudText>
+                                        <MudText Typo="Typo.h6" Class="mx-2">•</MudText>
+                                        <MudElement HtmlTag="div" Class="d-flex align-center">
+                                            <MudIcon Icon="@Icons.Outlined.Layers" Size="Size.Small" />
+                                            <MudTooltip Placement="Placement.Top" Text="Tasks queued">
+                                                <MudText Class="ml-1">@pipelineRunInstance.Tasks.Count</MudText>
+                                            </MudTooltip>
+                                        </MudElement>
+                                    </MudElement>
+                                    <MudElement HtmlTag="div" Class="d-flex">
+                                        <MudTooltip Placement="Placement.Top" Text="Account country">
+                                            <MudChip Icon="@Icons.Outlined.AccountCircle" Label="true" Variant="Variant.Filled" Size="Size.Small" >@pipelineRunInstance.Settings.AccountCountryCode</MudChip>
+                                        </MudTooltip>
+                                        <MudTooltip Placement="Placement.Top" Text="Sms country">
+                                            <MudChip Icon="@Icons.Outlined.PhonelinkSetup" Label="true" Variant="Variant.Filled" Size="Size.Small">@pipelineRunInstance.Settings.PhoneCountryCode</MudChip>
+                                        </MudTooltip>
+                                        @if (pipelineRunInstance.Settings.HasForwardingEnabled)
+                                        {
+                                            <MudTooltip Placement="Placement.Top" Text="Forwarding">
+                                                <MudChip Icon="@Icons.Outlined.ForwardToInbox" Label="true" Variant="Variant.Filled" Size="Size.Small">Enabled</MudChip>
+                                            </MudTooltip>
+                                        }
+                                    </MudElement>
+                                </MudItem>
+                                <MudItem xs="3" Class="d-flex align-center">
+                                    <MudElement HtmlTag="div" Class="d-flex align-center">
+                                        <MudIcon Icon="@Icons.Outlined.Event" Size="Size.Small" Style="font-size: 14px" />
+                                        <MudText Class="ml-2" Style="font-size: 14px">@((DateTime.Now - pipelineRunInstance.CreateTime).GetReadableTimespan()) ago</MudText>
+                                    </MudElement>
+                                </MudItem>
+                                <MudItem xs="2" Class="d-flex align-center">
+                                    <MudTooltip Placement="Placement.Top" Text="Details">
+                                        <MudIconButton Icon="@Icons.Outlined.ReadMore" Size="Size.Medium" OnClick="() => NavigateToRunDetails(pipelineRunInstance.Id)" />
+                                    </MudTooltip>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            }
+            else
+            {
+	            <MudElement HtmlTag="div" Class="d-flex mt-4">
+		            <MudText Typo="Typo.subtitle1">Nothing to show for the moment, please start a gen.</MudText>
+	            </MudElement>
+            }
+        </MudItem>
+
+        <MudItem xs="4" Style="position: sticky;top: 0;height: 80vh;">
+            <MudGrid>
+                <MudItem xs="12">
+	                <AccountGenBucketCard />
+                </MudItem>
+	            <MudItem xs="12">
+                    <HarvesterInfoCard />
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code
+{
+    private async Task ToggleForm()
+    {
+        var dialog = DialogService.Show<GenForm>("Gen options", new DialogOptions
+        {
+            FullScreen = true
+        });
+
+        var dialogResult = await dialog.Result;
+
+        if (!dialogResult.Cancelled)
+        {
+            Snackbar.Add("Gen queued", Severity.Info);
+            var model = dialogResult.Data as AccountGenerationDto;
+
+            var result = await AccountGenerationManager.CreateInstance(model);
+
+            if (result.IsFailed)
+            {
+                var message = result.Errors.First().Message;
+                Snackbar.Add($"Gen failed. Reason: {message}", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Gen finished", Severity.Info, options =>
+            {
+                options.Onclick = snackbar =>
+                {
+                    NavigationManager.NavigateTo($"/generator/details/{result.Value}");
+                    return Task.CompletedTask;
+                };
+            });
+
+            InvalidateState();
+        }
+    }
+
+    private void NavigateToRunDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/generator/details/{id}");
+    }
+
+    protected override async Task<List<PipelineRunInstance>> ComputeState(CancellationToken cancellationToken)
+    {
+        return await AccountGenerationManager.GetPipelineInstances();
+    }
+}

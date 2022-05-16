@@ -1,0 +1,41 @@
+﻿@using System.ComponentModel.DataAnnotations
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">Run harvester</MudText>
+	</TitleContent>
+	<DialogContent>
+		<EditForm Model="_model" OnValidSubmit="Submit">
+			<DataAnnotationsValidator />
+			<MudCard Elevation="0">
+				<MudCardContent>
+					<MudElement Class="mb-6" HtmlTag="div">
+						<MudTextField T="int" @bind-Value="_model.Count" Label="Tasks" Variant="Variant.Outlined"
+						              For="@(() => _model.Count)"  />
+					</MudElement>
+				</MudCardContent>
+				<MudCardActions Class="d-flex justify-center mt-4">
+					<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px" StartIcon="@Icons.Material.Filled.PlayArrow">Start</MudButton>
+				</MudCardActions>
+			</MudCard>
+		</EditForm>
+	</DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	public class Model
+	{
+		[Required]
+		[Range(1, 250)]
+		public int Count { get; set; } = 1;
+	}
+
+	private Model _model = new();
+	
+    private void Submit()
+    {
+	    MudDialog.Close(DialogResult.Ok(_model.Count));
+    }
+}

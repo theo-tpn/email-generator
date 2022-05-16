@@ -1,0 +1,98 @@
+﻿@page "/proxies"
+@using Noctus.GenWave.Desktop.App.Managers
+@using System.Threading
+@using Size = MudBlazor.Size
+@using Color = MudBlazor.Color
+
+@inject IDialogService DialogService
+@inject ProxyManager ProxyManager
+@inject ISnackbar Snackbar
+@inherits Stl.Fusion.Blazor.LiveComponentBase<IEnumerable<ProxiesSetEntity>>
+
+@{
+    var state = State.LastValue;
+    var error = State.Error;
+}
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pt-8 pb-8">
+    <MudElement HtmlTag="div" class="d-flex mb-3">
+        <MudDivider Vertical="true" FlexItem="true" Class="mud-divider-vertical mr-4" />
+        <MudText Typo="Typo.h4" Class="align-self-center">Proxies</MudText>
+        <MudIconButton Icon="@Icons.Outlined.AddCircle" Size="Size.Medium" Color="Color.Primary" Class="ml-4 align-self-center" OnClick="OpenDialog" />
+    </MudElement>
+    <MudGrid Spacing="4" Class="mt-4">
+        @if (state == null || !state.Any())
+        {
+	        <MudItem xs="12">
+		        <MudText Typo="Typo.subtitle1">Nothing to show at the moment, add a proxies list !</MudText>
+	        </MudItem>
+        }
+        else
+        {
+            @foreach (var proxiesSet in state.OrderBy(x => x.Name))
+            {
+                <MudItem xs="12">
+                    <MudCard Elevation="10">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">
+                                    @proxiesSet.Name.ToUpper() (@proxiesSet.Proxies.Count)
+                                </MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Transparent" Size="Size.Medium" Class="mt-1" OnClick="() => DeleteProxiesSet(proxiesSet)"></MudIconButton>
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                    </MudCard>
+                </MudItem>
+            }
+        }
+    </MudGrid>
+</MudContainer>
+
+<MudMessageBox @ref="MessageBox" Title="Warning" CancelText="Cancel">
+    <MessageContent>
+        This action will delete this file. Are you sure ?
+    </MessageContent>
+    <YesButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error">Proceed</MudButton>
+    </YesButton>
+</MudMessageBox>
+
+@code
+{
+    private MudMessageBox MessageBox { get; set; }
+
+    private void OpenDialog()
+    {
+        DialogService.Show<CreateProxiesSetDialog>("Create ProxiesSetId List", new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium
+        });
+    }
+
+    private async Task DeleteProxiesSet(ProxiesSetEntity proxiesSet)
+    {
+        var messageBoxResult = await MessageBox.Show(new DialogOptions { MaxWidth = MaxWidth.Small });
+
+        if (messageBoxResult == null || messageBoxResult == false)
+            return;
+
+        var result = ProxyManager.DeleteProxiesSet(proxiesSet.Id);
+
+        if (result.IsFailed)
+        {
+            Snackbar.Add("Error", Severity.Error);
+        }
+        else
+        {
+            Snackbar.Add("Proxy set deleted", Severity.Success);
+        }
+    }
+
+    protected override async Task<IEnumerable<ProxiesSetEntity>> ComputeState(CancellationToken cancellationToken)
+    {
+        return await ProxyManager.GetProxiesBucket();
+    }
+}

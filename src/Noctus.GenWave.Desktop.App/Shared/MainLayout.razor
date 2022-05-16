@@ -1,0 +1,87 @@
+﻿@using Noctus.GenWave.Desktop.App.Managers
+
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject AppManager AppManager
+@inject AuthenticationManager AuthManager
+ 
+<MudThemeProvider Theme="_genWaveTheme"/>
+<MudDialogProvider 
+    FullWidth="true"
+    MaxWidth="MaxWidth.Medium"
+	CloseButton="true"
+    Position="DialogPosition.Center"/>
+<MudSnackbarProvider />
+
+<MudLayout>
+	<MudAppBar Elevation="0" Dense="true" Class="draggable" Fixed="true">
+        <MudElement HtmlTag="div" Class="d-flex ml-3 py-1" Style="max-height: 30px">
+            <svg xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <style>
+                        @@font-face {
+                            font-family: 'BABAPRO FONT';
+                            src: url('../fonts/BabaPro-Bold.ttf');
+                        }
+                        .cls-1 {
+                            font-size: 1.25rem;
+                            fill: #fff;
+                            font-family: "BABAPRO FONT";
+                            font-weight: 700;
+                        }
+                    </style>
+                </defs>
+                <text id="GENWAVE" class="cls-1" y="17" font-family="BABAPRO FONT">GENWAVE</text>
+            </svg>
+        </MudElement>
+		<MudAppBarSpacer/>
+		
+		<button class="ui-btn minimize undraggable" @onclick="AppManager.MinimizeApp">
+			<svg x="0px" y="0px" viewBox="0 0 10.2 1"><rect x="0" y="50%" width="10.2" height="1" /></svg>
+		</button>
+		<button class="ui-btn restore undraggable" @onclick="AppManager.Restore">
+			<svg viewBox="0 0 10 10"><path d="M0,0v10h10V0H0z M9,9H1V1h8V9z" /></svg>
+		</button>
+		<button class="ui-btn close undraggable" @onclick="CloseApp">
+			<svg viewBox="0 0 10 10"><polygon points="10.2,0.7 9.5,0 5.1,4.4 0.7,0 0,0.7 4.4,5.1 0,9.5 0.7,10.2 5.1,5.8 9.5,10.2 10.2,9.5 5.8,5.1" /></svg>
+		</button>
+	</MudAppBar>
+    <AppContent BodyContent="Body"></AppContent>
+	<MudScrollToTop>
+		<MudFab Color="Color.Primary" Icon="@Icons.Material.Filled.ArrowUpward"/>
+	</MudScrollToTop>
+</MudLayout>
+
+
+@code
+{
+    private readonly MudTheme _genWaveTheme = new()
+    {
+        Palette = new Palette
+        {
+            Background = "#3e3b65",
+            DrawerBackground = "#383058",
+            TextPrimary = "#f1edff",
+            DrawerText = "#f1edff",
+            DrawerIcon = "#f1edff",
+            ActionDefault = "#f1edff",
+            Surface = "#383058",
+            TextSecondary = "#787098",
+            Primary = "#6cd4fe",
+            Secondary = "#f67ada",
+            TextDisabled = "#f1edff80",
+            AppbarBackground = "#383058"
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DrawerWidth = "200px",
+            AppbarMinHeight = "46px"
+        }
+    };
+
+    void CloseApp()
+    {
+        var _ = AuthManager.Logout();
+        AppManager.CloseApp();
+    }
+}

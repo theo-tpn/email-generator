@@ -1,0 +1,41 @@
+{
+  "executable": "Noctus.GenWave.Desktop.App",
+  "name": "Genwave",
+  "author": "Noctus",
+  "singleInstance": true,
+  "environment": "Production",
+  "build": {
+    "appId": "com.Noctus.GenWave.Desktop.App.app",
+    "productName": "Genwave",
+    "copyright": "Copyright Noctus - Genwave © 2021",
+    "buildVersion": "0.0.91",
+    "compression": "maximum",
+    "directories": {
+      "output": "../../../bin/Desktop"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://www.genwave.xyz/download",
+      "channel": "latest"
+    },
+    "win": {
+      "icon": "../../../build/icon.ico"
+    },
+    "extraResources": [
+      {
+        "from": "./bin",
+        "to": "bin",
+        "filter": [ "**/*" ]
+      }
+    ],
+    "files": [
+      {
+        "from": "./ElectronHostHook/node_modules",
+        "to": "ElectronHostHook/node_modules",
+        "filter": [ "**/*" ]
+      },
+      "**/*",
+      "build/*"
+    ]
+  }
+}

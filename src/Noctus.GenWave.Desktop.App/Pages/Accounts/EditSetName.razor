@@ -1,0 +1,49 @@
+﻿@using System.ComponentModel.DataAnnotations
+
+<MudDialog>
+	<TitleContent>
+		<MudText Typo="Typo.h6">Rename set</MudText>
+	</TitleContent>
+	<DialogContent>
+		<EditForm Model="_model" OnValidSubmit="Submit">
+			<DataAnnotationsValidator />
+			<MudCard Elevation="0">
+				<MudCardContent>
+					<MudElement Class="mb-6" HtmlTag="div">
+						<MudTextField T="string" @bind-Value="_model.Name" Label="Name" Variant="Variant.Outlined"
+						              For="@(() => _model.Name)" />
+					</MudElement>
+				</MudCardContent>
+				<MudCardActions Class="d-flex justify-center mt-4">
+					<MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="gradient-button" Style="width: 150px">Save</MudButton>
+				</MudCardActions>
+			</MudCard>
+		</EditForm>
+		</DialogContent>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	[Parameter] public string Name { get; set; }
+
+	public class Model
+	{
+		[Required]
+		[RegularExpression(@"^[0-9a-zA-Z_\-. ]+$", ErrorMessage = "Input contains forbidden characters")]
+		[MaxLength(50)]
+		public string Name { get; set; }
+	}
+
+	private Model _model;
+
+	protected override void OnInitialized()
+	{
+		_model = new Model {Name = Name};
+	}
+
+	public void Submit() 
+	{ 
+		MudDialog.Close(DialogResult.Ok(_model.Name));
+	}
+}

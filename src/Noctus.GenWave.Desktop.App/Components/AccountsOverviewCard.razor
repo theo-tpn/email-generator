@@ -1,0 +1,32 @@
+﻿@using Noctus.Domain.Interfaces.Services
+@using Noctus.Domain.Interfaces.Repositories
+@using System.Threading
+@using Noctus.Application.Services
+
+@inherits Stl.Fusion.Blazor.LiveComponentBase<int>
+@inject IAccountSetService AccountSetService
+
+@{
+    var state = State.LastValue;
+    var error = State.Error;
+}
+
+<MudCard Elevation="10" Class="px-8" Style="background: var(--card-gradient-3)">
+    <MudCardContent>
+        <MudText Typo="Typo.h5" Class="mb-2">Accounts</MudText>
+        <MudElement HtmlTag="div" Class="d-flex flex-row">
+            <MudElement HtmlTag="div">
+                <MudText Typo="Typo.subtitle1">Generated</MudText>
+                <MudText Style="font-size: 36px">@state</MudText>
+            </MudElement>
+        </MudElement>
+    </MudCardContent>
+</MudCard>
+@code {
+
+    protected override Task<int> ComputeState(CancellationToken cancellationToken)
+    {
+        return AccountSetService.GetGeneratedAccountsCount();
+    }
+
+}

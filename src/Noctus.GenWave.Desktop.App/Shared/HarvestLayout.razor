@@ -1,0 +1,30 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_genWaveTheme" />
+
+<MudLayout Style="-webkit-app-region: drag;">
+	<MudMainContent>
+		@Body
+	</MudMainContent>
+</MudLayout>
+
+@code {
+	private readonly MudTheme _genWaveTheme = new()
+	{
+		Palette = new Palette
+		{
+			Background = "#3e3b65",
+			DrawerBackground = "#383058",
+			TextPrimary = "#f1edff",
+			DrawerText = "#f1edff",
+			DrawerIcon = "#f1edff",
+			ActionDefault = "#f1edff",
+			Surface = "#383058",
+			TextSecondary = "#787098",
+			Primary = "#6cd4fe",
+			Secondary = "#f67ada",
+			TextDisabled = "#f1edff80",
+			AppbarBackground = "#383058"
+		}
+	};
+}
